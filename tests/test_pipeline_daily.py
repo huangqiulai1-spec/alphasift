@@ -50,6 +50,8 @@ def test_pipeline_enriches_daily_features_for_daily_strategy(monkeypatch):
             enriched.at[idx, "rsi_status"] = "neutral"
             enriched.at[idx, "volume_ratio_20d"] = 1.0 if is_target else 1.8
             enriched.at[idx, "pullback_to_ma20_pct"] = 4 if is_target else 12
+            enriched.at[idx, "volatility_20d_pct"] = 25 if is_target else 60
+            enriched.at[idx, "max_drawdown_20d_pct"] = -5 if is_target else -18
         return enriched
 
     monkeypatch.setattr("alphasift.pipeline.fetch_snapshot_with_fallback", lambda sources, **kwargs: df)
@@ -70,6 +72,8 @@ def test_pipeline_enriches_daily_features_for_daily_strategy(monkeypatch):
     assert result.after_filter_count == 1
     assert result.picks[0].code == "000001"
     assert result.picks[0].ma_bullish is True
+    assert result.picks[0].volatility_20d_pct == 25
+    assert result.picks[0].max_drawdown_20d_pct == -5
     assert any("Daily K-line enrichment attempted 2 candidates" in item for item in result.degradation)
 
 

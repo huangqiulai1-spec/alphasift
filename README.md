@@ -172,7 +172,7 @@ AlphaSift is designed to reuse LiteLLM-style configuration used by `daily_stock_
 | `POST_ANALYZERS` | No | L3 analyzers; set `none` to disable | `scorecard` |
 | `DSA_API_URL` | For DSA analyzer | DSA service URL or full analysis endpoint | - |
 | `DAILY_ENRICH_ENABLED` | No | Enable candidate-level daily K-line enrichment | `false` |
-| `DAILY_SOURCE` | No | Daily K-line source: `auto`, `tencent`, `akshare`, `baostock`, or `tushare` | `auto` |
+| `DAILY_SOURCE` | No | Daily K-line source: `auto`, `tencent`, `sina`, `akshare`, `baostock`, or `tushare` | `auto` |
 | `ALPHASIFT_DATA_DIR` | No | Run records, caches, and evaluation results | `./data` |
 | `STRATEGIES_DIR` | No | Custom strategy directory | auto-detect |
 
@@ -229,13 +229,13 @@ tushare -> sina -> efinance -> akshare_em -> em_datacenter
 | `em_datacenter` | Eastmoney Data Center | Often available outside trading hours |
 | `tushare` | Tushare Pro `daily` + `daily_basic` | Requires token; previous/nearest trading day data |
 
-Daily K-line enrichment defaults to `DAILY_SOURCE=auto`. The auto chain uses `tushare -> tencent -> akshare -> baostock` when a Tushare token is configured, otherwise `tencent -> akshare -> baostock`. Tencent is a direct HTTP K-line source with no wrapper dependency and is preferred over Eastmoney-heavy wrapper paths for candidate-level history enrichment. Repeatedly failing sources are temporarily skipped, and expired daily cache can be used as a marked stale fallback when every live daily source fails.
+Daily K-line enrichment defaults to `DAILY_SOURCE=auto`. The auto chain uses `tushare -> tencent -> sina -> akshare -> baostock` when a Tushare token is configured, otherwise `tencent -> sina -> akshare -> baostock`. Tencent is a direct HTTP K-line source with no wrapper dependency and is preferred over Eastmoney-heavy wrapper paths for candidate-level history enrichment; Sina provides a second direct HTTP fallback before wrapper sources. Repeatedly failing sources are temporarily skipped, and expired daily cache can be used as a marked stale fallback when every live daily source fails.
 
 Source support matrix:
 
 | Capability | Primary chain | Fields |
 |---|---|---|
-| Daily K-line enrichment | `tushare` when token exists, then `tencent`, `akshare`, `baostock` | OHLCV, qfq where supported, technical factors |
+| Daily K-line enrichment | `tushare` when token exists, then `tencent`, `sina`, `akshare`, `baostock` | OHLCV, qfq where supported, technical factors, 20d volatility/drawdown controls |
 | Full-market snapshot | `sina`, then `efinance`, `akshare_em`, `em_datacenter`; `tushare` first when token exists | price, change, amount, market cap, PE/PB, turnover |
 | Candidate context | `news`, `fund_flow`, `announcement`, `quote` | news, announcements, fund flow, Tencent quote valuation/turnover |
 | Last-good fallback | daily history cache and snapshot cache | marked with stale/fallback attrs when live sources fail |

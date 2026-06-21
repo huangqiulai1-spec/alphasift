@@ -51,6 +51,8 @@ def test_compute_daily_features_adds_trend_fields():
     assert features["body_pct"] > 0
     assert features["pullback_to_ma20_pct"] > 0
     assert features["consolidation_days_20d"] >= 8
+    assert float(features["volatility_20d_pct"]) >= 0
+    assert float(features["max_drawdown_20d_pct"]) <= 0
 
 
 def test_fetch_daily_history_retries_transient_source_errors(monkeypatch):
@@ -411,6 +413,81 @@ def test_fetch_daily_history_auto_uses_tencent_before_wrapper_sources(monkeypatc
 
     assert calls[0]["params"] == {"param": "sh600519,day,,,120,qfq"}
     assert result["close"].iloc[-1] == 101
+
+
+def test_fetch_daily_history_supports_sina_direct_http(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "result": {
+                    "data": [
+                        {"day": "2026-04-28", "open": "10.0", "high": "10.5", "low": "9.9", "close": "10.4", "volume": "12345"},
+                        {"day": "2026-04-29", "open": "10.4", "high": "10.6", "low": "10.3", "close": "10.5", "volume": "12300"},
+                    ]
+                }
+            }
+
+    def fake_get(url, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return FakeResponse()
+
+    monkeypatch.setattr("alphasift.daily.requests.get", fake_get)
+
+    result = fetch_daily_history("000001", source="sina", retries=0)
+
+    assert "CN_MarketDataService.getKLineData" in captured["url"]
+    assert captured["params"] == {"symbol": "sz000001", "scale": 240, "ma": "no", "datalen": 120}
+    assert list(result.columns) == ["date", "open", "close", "high", "low", "volume", "amount"]
+    assert list(result["date"]) == ["2026-04-28", "2026-04-29"]
+    assert result["close"].iloc[-1] == 10.5
+
+
+def test_fetch_daily_history_auto_falls_back_from_tencent_to_sina(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        if "fqkline" in url:
+            return FakeResponse({"code": 0, "data": {}})
+        return FakeResponse({
+            "result": {
+                "data": [
+                    {"day": "2026-04-29", "open": "10", "high": "11", "low": "9", "close": "10.5", "volume": "1000"}
+                ]
+            }
+        })
+
+    class FakeAkshare:
+        @staticmethod
+        def stock_zh_a_hist(**kwargs):
+            raise AssertionError("akshare should not be called when sina succeeds")
+
+    monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
+    monkeypatch.delenv("TUSHARE_API_TOKEN", raising=False)
+    monkeypatch.setattr("alphasift.daily.requests.get", fake_get)
+    monkeypatch.setitem(sys.modules, "akshare", FakeAkshare)
+
+    result = fetch_daily_history("000001", source="auto", retries=0)
+
+    assert "fqkline" in calls[0][0]
+    assert "CN_MarketDataService.getKLineData" in calls[1][0]
+    assert result["close"].iloc[-1] == 10.5
 
 
 def test_enrich_daily_features_keeps_successful_rows_when_one_fetch_fails(monkeypatch):

@@ -90,6 +90,8 @@ def test_apply_hard_filters_uses_daily_shape_features_when_present():
                 "body_pct": 1.2,
                 "pullback_to_ma20_pct": 4.0,
                 "consolidation_days_20d": 10,
+                "volatility_20d_pct": 28.0,
+                "max_drawdown_20d_pct": -5.5,
             },
             {
                 "name": "伪突破B",
@@ -101,6 +103,8 @@ def test_apply_hard_filters_uses_daily_shape_features_when_present():
                 "body_pct": -0.5,
                 "pullback_to_ma20_pct": 14.0,
                 "consolidation_days_20d": 3,
+                "volatility_20d_pct": 62.0,
+                "max_drawdown_20d_pct": -18.0,
             },
         ]
     )
@@ -114,6 +118,8 @@ def test_apply_hard_filters_uses_daily_shape_features_when_present():
             body_pct_min=0,
             pullback_to_ma20_pct_max=8,
             consolidation_days_20d_min=8,
+            volatility_20d_pct_max=40,
+            max_drawdown_20d_pct_min=-10,
         ),
     )
 
@@ -138,6 +144,8 @@ def test_apply_hard_filters_matches_one_pass_numeric_and_daily_filters():
             "body_pct": 1.0,
             "pullback_to_ma20_pct": 3.0,
             "consolidation_days_20d": 10,
+            "volatility_20d_pct": 25.0,
+            "max_drawdown_20d_pct": -4.0,
         },
         {
             "name": "金额不足B",
@@ -155,6 +163,8 @@ def test_apply_hard_filters_matches_one_pass_numeric_and_daily_filters():
             "body_pct": 0.8,
             "pullback_to_ma20_pct": 2.0,
             "consolidation_days_20d": 12,
+            "volatility_20d_pct": 24.0,
+            "max_drawdown_20d_pct": -3.0,
         },
         {
             "name": "日线不符C",
@@ -172,6 +182,8 @@ def test_apply_hard_filters_matches_one_pass_numeric_and_daily_filters():
             "body_pct": 1.4,
             "pullback_to_ma20_pct": 2.5,
             "consolidation_days_20d": 11,
+            "volatility_20d_pct": 35.0,
+            "max_drawdown_20d_pct": -6.0,
         },
         {
             "name": "形态不符D",
@@ -189,6 +201,8 @@ def test_apply_hard_filters_matches_one_pass_numeric_and_daily_filters():
             "body_pct": -0.2,
             "pullback_to_ma20_pct": 12.0,
             "consolidation_days_20d": 4,
+            "volatility_20d_pct": 70.0,
+            "max_drawdown_20d_pct": -20.0,
         },
     ])
     filters = HardFilterConfig(
@@ -208,6 +222,8 @@ def test_apply_hard_filters_matches_one_pass_numeric_and_daily_filters():
         body_pct_min=0,
         pullback_to_ma20_pct_max=8,
         consolidation_days_20d_min=8,
+        volatility_20d_pct_max=45,
+        max_drawdown_20d_pct_min=-12,
     )
 
     result = apply_hard_filters(df, filters)
@@ -227,5 +243,7 @@ def test_apply_hard_filters_matches_one_pass_numeric_and_daily_filters():
         & (df["body_pct"] >= 0)
         & (df["pullback_to_ma20_pct"] <= 8)
         & (df["consolidation_days_20d"] >= 8)
+        & (df["volatility_20d_pct"] <= 45)
+        & (df["max_drawdown_20d_pct"] >= -12)
     )
     assert result["name"].tolist() == df.loc[expected_mask, "name"].tolist()

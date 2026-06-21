@@ -28,6 +28,10 @@ _DAILY_FILTER_DEFAULTS = {
     "pullback_to_ma20_pct_max": None,
     "consolidation_days_20d_min": None,
     "consolidation_days_20d_max": None,
+    "volatility_20d_pct_min": None,
+    "volatility_20d_pct_max": None,
+    "max_drawdown_20d_pct_min": None,
+    "max_drawdown_20d_pct_max": None,
 }
 
 
@@ -84,6 +88,10 @@ def apply_hard_filters(df: pd.DataFrame, filters: HardFilterConfig) -> pd.DataFr
     mask = _filter_max(result, mask, ["pullback_to_ma20_pct"], filters.pullback_to_ma20_pct_max)
     mask = _filter_min(result, mask, ["consolidation_days_20d"], filters.consolidation_days_20d_min)
     mask = _filter_max(result, mask, ["consolidation_days_20d"], filters.consolidation_days_20d_max)
+    mask = _filter_min(result, mask, ["volatility_20d_pct"], filters.volatility_20d_pct_min)
+    mask = _filter_max(result, mask, ["volatility_20d_pct"], filters.volatility_20d_pct_max)
+    mask = _filter_min(result, mask, ["max_drawdown_20d_pct"], filters.max_drawdown_20d_pct_min)
+    mask = _filter_max(result, mask, ["max_drawdown_20d_pct"], filters.max_drawdown_20d_pct_max)
 
     return result.loc[mask].copy()
 
@@ -109,6 +117,10 @@ def requires_daily_features(filters: HardFilterConfig) -> bool:
         filters.pullback_to_ma20_pct_max is not None,
         filters.consolidation_days_20d_min is not None,
         filters.consolidation_days_20d_max is not None,
+        filters.volatility_20d_pct_min is not None,
+        filters.volatility_20d_pct_max is not None,
+        filters.max_drawdown_20d_pct_min is not None,
+        filters.max_drawdown_20d_pct_max is not None,
     ])
 
 

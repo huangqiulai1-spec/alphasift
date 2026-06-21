@@ -477,6 +477,8 @@ def _df_to_picks(df: pd.DataFrame) -> list[Pick]:
             body_pct=_safe_float(row.get("body_pct")),
             pullback_to_ma20_pct=_safe_float(row.get("pullback_to_ma20_pct")),
             consolidation_days_20d=_safe_int(row.get("consolidation_days_20d")),
+            volatility_20d_pct=_safe_float(row.get("volatility_20d_pct")),
+            max_drawdown_20d_pct=_safe_float(row.get("max_drawdown_20d_pct")),
             factor_scores=factor_scores,
         ))
     return picks

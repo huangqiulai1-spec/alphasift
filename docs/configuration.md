@@ -75,7 +75,7 @@ TUSHARE_TOKEN=...
 | `DAILY_ENRICH_ENABLED` | 否 | 是否默认对 L1 后 Top N 候选补充日 K 特征 | `false` |
 | `DAILY_ENRICH_MAX_CANDIDATES` | 否 | 日 K 增强最多处理候选数 | `100` |
 | `DAILY_LOOKBACK_DAYS` | 否 | 日 K 特征回看天数 | `120` |
-| `DAILY_SOURCE` | 否 | 日 K 数据源：`auto`、`tencent`、`akshare`、`baostock` 或 `tushare`；`auto` 有 Tushare token 时使用 `tushare,tencent,akshare,baostock`，否则使用 `tencent,akshare,baostock` | `auto` |
+| `DAILY_SOURCE` | 否 | 日 K 数据源：`auto`、`tencent`、`sina`、`akshare`、`baostock` 或 `tushare`；`auto` 有 Tushare token 时使用 `tushare,tencent,sina,akshare,baostock`，否则使用 `tencent,sina,akshare,baostock` | `auto` |
 | `DAILY_FETCH_RETRIES` | 否 | 单只候选日 K 拉取失败后的重试次数 | `2` |
 | `DAILY_FETCH_MAX_WORKERS` | 否 | 日 K 拉取并发数，网络不稳时建议 `1`，稳定后可设 `2`/`4` | `1` |
 | `RISK_ENABLED` | 否 | 是否启用独立风险层 | `true` |
@@ -148,7 +148,7 @@ tushare -> sina -> efinance -> akshare_em -> em_datacenter
 
 | 能力 | 默认链路 | 主要字段 |
 |------|----------|----------|
-| 日 K 增强 | 有 token: `tushare,tencent,akshare,baostock`；无 token: `tencent,akshare,baostock` | OHLCV、前复权、技术指标 |
+| 日 K 增强 | 有 token: `tushare,tencent,sina,akshare,baostock`；无 token: `tencent,sina,akshare,baostock` | OHLCV、前复权（支持源）、技术指标、20日波动/回撤 |
 | 全市场快照 | 有 token: `tushare,sina,efinance,akshare_em,em_datacenter`；无 token: `sina,efinance,akshare_em,em_datacenter` | 价格、涨跌幅、成交额、市值、PE/PB、换手率 |
 | 候选级上下文 | `news,fund_flow,announcement,quote` | 新闻、资金流、公告、腾讯行情估值/换手率 |
 | 失败降级 | source health 熔断 + daily history cache + snapshot last-good cache | stale/fallback/source_errors 元数据 |

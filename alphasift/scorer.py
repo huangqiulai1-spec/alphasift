@@ -55,6 +55,10 @@ _DEFAULT_SCORING_PROFILE = {
     "stability_high_volume_ratio": 5.0,
     "stability_high_volume_ratio_penalty_slope": 4.0,
     "stability_invalid_pe_penalty": 18.0,
+    "stability_high_volatility_pct": 45.0,
+    "stability_high_volatility_penalty_slope": 0.45,
+    "stability_max_drawdown_floor_pct": -12.0,
+    "stability_drawdown_penalty_slope": 1.2,
     "theme_heat_unknown_score": 50.0,
     "theme_heat_change_slope": 6.0,
     "theme_heat_rank_bonus": 10.0,
@@ -323,6 +327,18 @@ def _compute_stability_score(df: pd.DataFrame, profile: dict[str, float]) -> pd.
     if "signal_score" in df.columns:
         signal = pd.to_numeric(df["signal_score"], errors="coerce").fillna(50)
         score = score + (signal - 50) * 0.12
+
+    if "volatility_20d_pct" in df.columns:
+        volatility = pd.to_numeric(df["volatility_20d_pct"], errors="coerce")
+        score -= (
+            volatility - profile["stability_high_volatility_pct"]
+        ).clip(lower=0).fillna(0) * profile["stability_high_volatility_penalty_slope"]
+
+    if "max_drawdown_20d_pct" in df.columns:
+        drawdown = pd.to_numeric(df["max_drawdown_20d_pct"], errors="coerce")
+        score -= (
+            profile["stability_max_drawdown_floor_pct"] - drawdown
+        ).clip(lower=0).fillna(0) * profile["stability_drawdown_penalty_slope"]
 
     return score.clip(0, 100)
 

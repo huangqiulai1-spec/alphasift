@@ -40,6 +40,10 @@ class HardFilterConfig:
     pullback_to_ma20_pct_max: float | None = None
     consolidation_days_20d_min: int | None = None
     consolidation_days_20d_max: int | None = None
+    volatility_20d_pct_min: float | None = None
+    volatility_20d_pct_max: float | None = None
+    max_drawdown_20d_pct_min: float | None = None
+    max_drawdown_20d_pct_max: float | None = None
 
 
 @dataclass
@@ -125,6 +129,8 @@ class Pick:
     body_pct: float | None = None
     pullback_to_ma20_pct: float | None = None
     consolidation_days_20d: int | None = None
+    volatility_20d_pct: float | None = None
+    max_drawdown_20d_pct: float | None = None
     factor_scores: dict[str, float] = field(default_factory=dict)
     llm_confidence: float | None = None
     llm_sector: str = ""

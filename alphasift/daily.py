@@ -34,6 +34,8 @@ _DAILY_FEATURE_DEFAULTS = {
     "body_pct": pd.NA,
     "pullback_to_ma20_pct": pd.NA,
     "consolidation_days_20d": pd.NA,
+    "volatility_20d_pct": pd.NA,
+    "max_drawdown_20d_pct": pd.NA,
 }
 _DAILY_ENRICH_MAX_WORKERS = 1
 _DAILY_HISTORY_CACHE_VERSION = 1
@@ -124,10 +126,11 @@ def fetch_daily_history(
 ) -> pd.DataFrame:
     """Fetch daily history for one stock code.
 
-    ``source`` accepts ``tencent``, ``akshare``, ``baostock``, ``tushare``,
+    ``source`` accepts ``tencent``, ``sina``, ``akshare``, ``baostock``, ``tushare``,
     ``yfinance`` or ``auto``. ``auto`` prefers Tushare when a token is
     configured, then Tencent's direct HTTP K-line endpoint before wrapper-based
-    free sources. Without a token it starts with Tencent. ``yfinance`` is
+    free sources. Without a token it starts with Tencent. Sina is a second
+    direct HTTP K-line source before wrapper-based fallbacks. ``yfinance`` is
     explicit-only (never part of ``auto``) and expects a US ticker rather than
     an A-share code.
     """
@@ -136,11 +139,11 @@ def fetch_daily_history(
     src = _normalize_daily_source(source)
     if src == "auto":
         sources: tuple[str, ...] = (
-            ("tushare", "tencent", "akshare", "baostock")
+            ("tushare", "tencent", "sina", "akshare", "baostock")
             if _has_tushare_token()
-            else ("tencent", "akshare", "baostock")
+            else ("tencent", "sina", "akshare", "baostock")
         )
-    elif src in ("akshare", "baostock", "tushare", "tencent", "yfinance"):
+    elif src in ("akshare", "baostock", "tushare", "tencent", "sina", "yfinance"):
         sources = (src,)
     else:
         raise ValueError(f"Unsupported daily source: {source}")
@@ -172,6 +175,11 @@ def fetch_daily_history(
                     result = fetch_daily_history_yfinance(code, lookback_days=lookback_days)
                 elif current == "tencent":
                     result = _fetch_daily_tencent(
+                        normalized_code,
+                        lookback_days=normalized_lookback_days,
+                    )
+                elif current == "sina":
+                    result = _fetch_daily_sina(
                         normalized_code,
                         lookback_days=normalized_lookback_days,
                     )
@@ -418,6 +426,52 @@ def _fetch_daily_tencent(code: str, *, lookback_days: int) -> pd.DataFrame:
         normalized_rows,
         columns=["date", "open", "close", "high", "low", "volume", "amount"],
     )
+    for col in ("open", "close", "high", "low", "volume", "amount"):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df.tail(count).copy()
+
+
+def _fetch_daily_sina(code: str, *, lookback_days: int) -> pd.DataFrame:
+    """Fetch unadjusted daily history from Sina's direct K-line API.
+
+    Sina provides a lightweight non-Eastmoney HTTP fallback for A-share daily
+    bars. It does not expose forward-adjusted prices on this endpoint, so it is
+    deliberately placed behind Tencent in ``auto`` but ahead of wrapper-heavy
+    sources that are more prone to dependency/API drift.
+    """
+    symbol = _to_tencent_code(code)
+    count = max(int(lookback_days), 30)
+    response = requests.get(
+        "https://quotes.sina.cn/cn/api/openapi.php/CN_MarketDataService.getKLineData",
+        params={"symbol": symbol, "scale": 240, "ma": "no", "datalen": count},
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    data = payload.get("result", {}).get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list) or not data:
+        raise RuntimeError(f"sina daily history empty for {code}")
+
+    rows: list[dict[str, object]] = []
+    for row in data:
+        if not isinstance(row, dict):
+            continue
+        rows.append({
+            "date": row.get("day") or row.get("date"),
+            "open": row.get("open"),
+            "close": row.get("close"),
+            "high": row.get("high"),
+            "low": row.get("low"),
+            "volume": row.get("volume"),
+            "amount": row.get("amount", pd.NA),
+        })
+    if not rows:
+        raise RuntimeError(f"sina daily history malformed for {code}")
+
+    df = pd.DataFrame(rows, columns=["date", "open", "close", "high", "low", "volume", "amount"])
+    if "date" in df.columns:
+        df = df.sort_values("date")
     for col in ("open", "close", "high", "low", "volume", "amount"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df.tail(count).copy()
@@ -737,6 +791,8 @@ def _compute_shape_features(
         if last_ma20 is not None and last_ma20 > 0
         else None
     )
+    volatility_20d_pct = _volatility_20d_pct(recent["close"])
+    max_drawdown_20d_pct = _max_drawdown_pct(recent["close"])
 
     return {
         "prev_high_20d": _round_or_none(prev_high_20d),
@@ -746,6 +802,8 @@ def _compute_shape_features(
         "body_pct": _round_or_none(body_pct),
         "pullback_to_ma20_pct": _round_or_none(pullback_to_ma20_pct),
         "consolidation_days_20d": _consolidation_days(previous),
+        "volatility_20d_pct": _round_or_none(volatility_20d_pct),
+        "max_drawdown_20d_pct": _round_or_none(max_drawdown_20d_pct),
     }
 
 
@@ -782,6 +840,23 @@ def _volume_ratio_20d(df: pd.DataFrame) -> float | None:
     if base <= 0:
         return None
     return float(volume.iloc[-1]) / base
+
+
+def _volatility_20d_pct(close: pd.Series) -> float | None:
+    values = pd.to_numeric(close, errors="coerce").dropna()
+    returns = values.pct_change().dropna()
+    if len(returns) < 2:
+        return None
+    return float(returns.std()) * (252 ** 0.5) * 100
+
+
+def _max_drawdown_pct(close: pd.Series) -> float | None:
+    values = pd.to_numeric(close, errors="coerce").dropna()
+    if values.empty:
+        return None
+    running_high = values.cummax()
+    drawdowns = values / running_high - 1.0
+    return min(float(drawdowns.min()) * 100, 0.0)
 
 
 def _consolidation_days(previous: pd.DataFrame, *, max_range_pct: float = 12.0) -> int | None:
