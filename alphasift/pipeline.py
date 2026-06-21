@@ -211,6 +211,9 @@ def screen(
             daily_source_counts = dict(enriched.attrs.get("daily_source_counts", {}) or {})
             daily_quality_flag_counts = dict(enriched.attrs.get("daily_quality_flag_counts", {}) or {})
             daily_source_order_notes = [str(item) for item in enriched.attrs.get("daily_source_order_notes", [])]
+            daily_source_health_notes = _daily_source_health_notes(
+                dict(enriched.attrs.get("daily_source_health", {}) or {})
+            )
             degradation.append(
                 f"Daily K-line enrichment attempted {enrich_count} candidates, "
                 f"succeeded {daily_enrich_count} of {after_filter_count} snapshot-filtered candidates"
@@ -227,6 +230,8 @@ def screen(
                 degradation.append(f"Daily K-line quality flags: {flag_summary}")
             if daily_source_order_notes:
                 degradation.append("Daily K-line source ordering: " + " | ".join(daily_source_order_notes[:3]))
+            if daily_source_health_notes:
+                degradation.append("Daily K-line source health: " + "; ".join(daily_source_health_notes))
             if daily_errors:
                 sample = " | ".join(daily_errors[:5])
                 suffix = f" | +{len(daily_errors) - 5} more" if len(daily_errors) > 5 else ""
@@ -577,6 +582,49 @@ def _event_source_weights(event_profile: dict[str, object]) -> dict[str, float] 
         except (TypeError, ValueError):
             continue
     return result or None
+
+
+def _daily_source_health_notes(health: dict[str, object], *, limit: int = 4) -> list[str]:
+    source_states: list[tuple[tuple[int, float, float, str], str, dict[object, object]]] = []
+    for source, raw_state in health.items():
+        if not isinstance(raw_state, dict):
+            continue
+        failures = _safe_float(raw_state.get("failures")) or 0.0
+        total_failures = _safe_float(raw_state.get("total_failures")) or 0.0
+        disabled = bool(raw_state.get("disabled"))
+        if not disabled and failures <= 0 and total_failures <= 0:
+            continue
+        severity_key = (
+            0 if disabled else 1 if failures > 0 else 2,
+            -failures,
+            -total_failures,
+            str(source),
+        )
+        source_states.append((severity_key, str(source), raw_state))
+
+    notes: list[str] = []
+    for _severity_key, source, raw_state in sorted(source_states):
+        failures = _safe_float(raw_state.get("failures")) or 0.0
+        total_failures = _safe_float(raw_state.get("total_failures")) or 0.0
+        disabled = bool(raw_state.get("disabled"))
+        last_rows = _safe_float(raw_state.get("last_rows")) or 0.0
+        parts: list[str] = []
+        if disabled:
+            parts.append("disabled")
+        if failures > 0:
+            parts.append(f"failures={failures:g}")
+        elif total_failures > 0:
+            parts.append(f"total_failures={total_failures:g}")
+        if last_rows > 0:
+            parts.append(f"last_rows={last_rows:g}")
+        if parts:
+            notes.append(f"{source} " + ",".join(parts))
+        if len(notes) >= limit:
+            break
+    hidden_count = len(source_states) - len(notes)
+    if hidden_count > 0:
+        notes.append(f"+{hidden_count} more")
+    return notes
 
 
 def _safe_text(v: object) -> str:
