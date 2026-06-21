@@ -85,6 +85,8 @@ _SCORING_PROFILE_KEYS = {
     "stability_high_volatility_penalty_slope",
     "stability_max_drawdown_floor_pct",
     "stability_drawdown_penalty_slope",
+    "stability_high_atr_pct",
+    "stability_high_atr_penalty_slope",
     "theme_heat_unknown_score",
     "theme_heat_change_slope",
     "theme_heat_rank_bonus",

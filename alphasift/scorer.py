@@ -59,6 +59,8 @@ _DEFAULT_SCORING_PROFILE = {
     "stability_high_volatility_penalty_slope": 0.45,
     "stability_max_drawdown_floor_pct": -12.0,
     "stability_drawdown_penalty_slope": 1.2,
+    "stability_high_atr_pct": 6.0,
+    "stability_high_atr_penalty_slope": 2.0,
     "theme_heat_unknown_score": 50.0,
     "theme_heat_change_slope": 6.0,
     "theme_heat_rank_bonus": 10.0,
@@ -339,6 +341,12 @@ def _compute_stability_score(df: pd.DataFrame, profile: dict[str, float]) -> pd.
         score -= (
             profile["stability_max_drawdown_floor_pct"] - drawdown
         ).clip(lower=0).fillna(0) * profile["stability_drawdown_penalty_slope"]
+
+    if "atr_20_pct" in df.columns:
+        atr = pd.to_numeric(df["atr_20_pct"], errors="coerce")
+        score -= (
+            atr - profile["stability_high_atr_pct"]
+        ).clip(lower=0).fillna(0) * profile["stability_high_atr_penalty_slope"]
 
     return score.clip(0, 100)
 

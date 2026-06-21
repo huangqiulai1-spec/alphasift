@@ -52,6 +52,7 @@ def test_pipeline_enriches_daily_features_for_daily_strategy(monkeypatch):
             enriched.at[idx, "pullback_to_ma20_pct"] = 4 if is_target else 12
             enriched.at[idx, "volatility_20d_pct"] = 25 if is_target else 60
             enriched.at[idx, "max_drawdown_20d_pct"] = -5 if is_target else -18
+            enriched.at[idx, "atr_20_pct"] = 3 if is_target else 9
             enriched.at[idx, "daily_source"] = "tencent"
         return enriched
 
@@ -75,6 +76,7 @@ def test_pipeline_enriches_daily_features_for_daily_strategy(monkeypatch):
     assert result.picks[0].ma_bullish is True
     assert result.picks[0].volatility_20d_pct == 25
     assert result.picks[0].max_drawdown_20d_pct == -5
+    assert result.picks[0].atr_20_pct == 3
     assert result.picks[0].daily_source == "tencent"
     assert any("Daily K-line enrichment attempted 2 candidates" in item for item in result.degradation)
 

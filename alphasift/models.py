@@ -44,6 +44,8 @@ class HardFilterConfig:
     volatility_20d_pct_max: float | None = None
     max_drawdown_20d_pct_min: float | None = None
     max_drawdown_20d_pct_max: float | None = None
+    atr_20_pct_min: float | None = None
+    atr_20_pct_max: float | None = None
 
 
 @dataclass
@@ -131,6 +133,7 @@ class Pick:
     consolidation_days_20d: int | None = None
     volatility_20d_pct: float | None = None
     max_drawdown_20d_pct: float | None = None
+    atr_20_pct: float | None = None
     daily_source: str = ""
     factor_scores: dict[str, float] = field(default_factory=dict)
     llm_confidence: float | None = None

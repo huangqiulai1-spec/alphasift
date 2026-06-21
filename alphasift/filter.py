@@ -32,6 +32,8 @@ _DAILY_FILTER_DEFAULTS = {
     "volatility_20d_pct_max": None,
     "max_drawdown_20d_pct_min": None,
     "max_drawdown_20d_pct_max": None,
+    "atr_20_pct_min": None,
+    "atr_20_pct_max": None,
 }
 
 
@@ -92,6 +94,8 @@ def apply_hard_filters(df: pd.DataFrame, filters: HardFilterConfig) -> pd.DataFr
     mask = _filter_max(result, mask, ["volatility_20d_pct"], filters.volatility_20d_pct_max)
     mask = _filter_min(result, mask, ["max_drawdown_20d_pct"], filters.max_drawdown_20d_pct_min)
     mask = _filter_max(result, mask, ["max_drawdown_20d_pct"], filters.max_drawdown_20d_pct_max)
+    mask = _filter_min(result, mask, ["atr_20_pct"], filters.atr_20_pct_min)
+    mask = _filter_max(result, mask, ["atr_20_pct"], filters.atr_20_pct_max)
 
     return result.loc[mask].copy()
 
@@ -121,6 +125,8 @@ def requires_daily_features(filters: HardFilterConfig) -> bool:
         filters.volatility_20d_pct_max is not None,
         filters.max_drawdown_20d_pct_min is not None,
         filters.max_drawdown_20d_pct_max is not None,
+        filters.atr_20_pct_min is not None,
+        filters.atr_20_pct_max is not None,
     ])
 
 

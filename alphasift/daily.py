@@ -36,6 +36,7 @@ _DAILY_FEATURE_DEFAULTS = {
     "consolidation_days_20d": pd.NA,
     "volatility_20d_pct": pd.NA,
     "max_drawdown_20d_pct": pd.NA,
+    "atr_20_pct": pd.NA,
     "daily_source": "",
 }
 _DAILY_ENRICH_MAX_WORKERS = 1
@@ -809,6 +810,7 @@ def _compute_shape_features(
     )
     volatility_20d_pct = _volatility_20d_pct(recent["close"])
     max_drawdown_20d_pct = _max_drawdown_pct(recent["close"])
+    atr_20_pct = _atr_20_pct(df)
 
     return {
         "prev_high_20d": _round_or_none(prev_high_20d),
@@ -820,6 +822,7 @@ def _compute_shape_features(
         "consolidation_days_20d": _consolidation_days(previous),
         "volatility_20d_pct": _round_or_none(volatility_20d_pct),
         "max_drawdown_20d_pct": _round_or_none(max_drawdown_20d_pct),
+        "atr_20_pct": _round_or_none(atr_20_pct),
     }
 
 
@@ -873,6 +876,28 @@ def _max_drawdown_pct(close: pd.Series) -> float | None:
     running_high = values.cummax()
     drawdowns = values / running_high - 1.0
     return min(float(drawdowns.min()) * 100, 0.0)
+
+
+def _atr_20_pct(df: pd.DataFrame) -> float | None:
+    if not {"high", "low", "close"}.issubset(df.columns):
+        return None
+    high = pd.to_numeric(df["high"], errors="coerce")
+    low = pd.to_numeric(df["low"], errors="coerce")
+    close = pd.to_numeric(df["close"], errors="coerce")
+    previous_close = close.shift(1)
+    true_range = pd.concat([
+        high - low,
+        (high - previous_close).abs(),
+        (low - previous_close).abs(),
+    ], axis=1).max(axis=1)
+    atr = true_range.tail(20).dropna().mean()
+    valid_close = close.dropna()
+    if valid_close.empty:
+        return None
+    last_close = float(valid_close.iloc[-1])
+    if pd.isna(atr) or last_close <= 0:
+        return None
+    return float(atr) / last_close * 100
 
 
 def _consolidation_days(previous: pd.DataFrame, *, max_range_pct: float = 12.0) -> int | None:

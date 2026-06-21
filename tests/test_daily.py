@@ -53,6 +53,7 @@ def test_compute_daily_features_adds_trend_fields():
     assert features["consolidation_days_20d"] >= 8
     assert float(features["volatility_20d_pct"]) >= 0
     assert float(features["max_drawdown_20d_pct"]) <= 0
+    assert float(features["atr_20_pct"]) > 0
 
 
 def test_fetch_daily_history_retries_transient_source_errors(monkeypatch):
