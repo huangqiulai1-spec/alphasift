@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from alphasift.config import Config
-from alphasift.pipeline import _sort_screened_candidates, screen
+from alphasift.pipeline import _daily_source_health_notes, _sort_screened_candidates, screen
 from alphasift.strategy import ScreeningConfig
 
 
@@ -99,6 +99,25 @@ def test_pipeline_enriches_daily_features_for_daily_strategy(monkeypatch):
     assert any("sina total_failures=1,last_rows=30" in item for item in result.degradation)
     assert any("Daily hard-filter rejections:" in item for item in result.degradation)
     assert any("require_ma_bullish removed 1" in item for item in result.degradation)
+
+
+def test_daily_source_health_notes_prioritize_severe_states_and_limit_noise():
+    notes = _daily_source_health_notes(
+        {
+            "akshare": {"failures": 0, "total_failures": 1, "last_rows": 40, "disabled": False},
+            "baostock": {"failures": 1, "total_failures": 3, "disabled": False},
+            "sina": {"failures": 0, "total_failures": 2, "last_rows": 30, "disabled": False},
+            "tencent": {"failures": 2, "total_failures": 2, "disabled": True},
+            "tushare": {"failures": 0, "total_failures": 0, "disabled": False},
+        },
+        limit=2,
+    )
+
+    assert notes == [
+        "tencent disabled,failures=2",
+        "baostock failures=1",
+        "+2 more",
+    ]
 
 
 def test_pipeline_preserves_degradation_when_hard_filter_empty(monkeypatch):

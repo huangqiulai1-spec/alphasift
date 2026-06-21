@@ -585,16 +585,29 @@ def _event_source_weights(event_profile: dict[str, object]) -> dict[str, float] 
 
 
 def _daily_source_health_notes(health: dict[str, object], *, limit: int = 4) -> list[str]:
-    notes: list[str] = []
-    for source, raw_state in sorted(health.items()):
+    source_states: list[tuple[tuple[int, float, float, str], str, dict[object, object]]] = []
+    for source, raw_state in health.items():
         if not isinstance(raw_state, dict):
             continue
         failures = _safe_float(raw_state.get("failures")) or 0.0
         total_failures = _safe_float(raw_state.get("total_failures")) or 0.0
         disabled = bool(raw_state.get("disabled"))
-        last_rows = _safe_float(raw_state.get("last_rows")) or 0.0
         if not disabled and failures <= 0 and total_failures <= 0:
             continue
+        severity_key = (
+            0 if disabled else 1 if failures > 0 else 2,
+            -failures,
+            -total_failures,
+            str(source),
+        )
+        source_states.append((severity_key, str(source), raw_state))
+
+    notes: list[str] = []
+    for _severity_key, source, raw_state in sorted(source_states):
+        failures = _safe_float(raw_state.get("failures")) or 0.0
+        total_failures = _safe_float(raw_state.get("total_failures")) or 0.0
+        disabled = bool(raw_state.get("disabled"))
+        last_rows = _safe_float(raw_state.get("last_rows")) or 0.0
         parts: list[str] = []
         if disabled:
             parts.append("disabled")
@@ -608,6 +621,9 @@ def _daily_source_health_notes(health: dict[str, object], *, limit: int = 4) -> 
             notes.append(f"{source} " + ",".join(parts))
         if len(notes) >= limit:
             break
+    hidden_count = len(source_states) - len(notes)
+    if hidden_count > 0:
+        notes.append(f"+{hidden_count} more")
     return notes
 
 
