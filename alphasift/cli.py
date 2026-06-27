@@ -176,6 +176,19 @@ def main():
     ebp.add_argument("--with-price-path", action="store_true", help="额外抓取日 K 路径，计算最大回撤和最大浮盈")
     ebp.add_argument("--price-path-lookback-days", type=int, default=None, help="价格路径日 K 回看天数")
 
+    # evaluate-strategies
+    esp = sub.add_parser("evaluate-strategies", help="生成策略级评估 summary")
+    esp.add_argument("--limit", type=int, default=20, help="最多评估最近 N 个 run")
+    esp.add_argument("--strategy", default=None, help="只评估指定策略")
+    esp.add_argument("--output", default=None, help="额外写出策略评估 JSON 到指定路径")
+    esp.add_argument("--json", action="store_true", help="以 JSON 输出")
+    esp.add_argument("--explain", action="store_true", help="输出紧凑可读摘要")
+    esp.add_argument("--cost-bps", type=float, default=None, help="评估收益扣除的往返成本，单位 bps")
+    esp.add_argument("--follow-through-pct", type=float, default=None, help="突破延续判定的最低收益百分比")
+    esp.add_argument("--failed-breakout-pct", type=float, default=None, help="突破失败判定的最高收益百分比")
+    esp.add_argument("--with-price-path", action="store_true", help="额外抓取日 K 路径，计算最大回撤和最大浮盈")
+    esp.add_argument("--price-path-lookback-days", type=int, default=None, help="价格路径日 K 回看天数")
+
     # runs
     rp = sub.add_parser("runs", help="列出已保存的运行")
     rp.add_argument("--limit", type=int, default=20)
@@ -339,6 +352,39 @@ def main():
             print(_format_evaluation_batch_explain(result))
         else:
             print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    elif args.command == "evaluate-strategies":
+        config = Config.from_env()
+        result = evaluate_saved_runs(
+            config=config,
+            limit=args.limit,
+            strategy=args.strategy,
+            cost_bps=args.cost_bps,
+            follow_through_pct=args.follow_through_pct,
+            failed_breakout_pct=args.failed_breakout_pct,
+            with_price_path=args.with_price_path or None,
+            price_path_lookback_days=args.price_path_lookback_days,
+        )
+        payload = {
+            "evaluated_at": result.get("evaluated_at"),
+            "snapshot_source": result.get("snapshot_source"),
+            "source_errors": result.get("source_errors", []),
+            "limit": result.get("limit"),
+            "strategy_filter": result.get("strategy_filter", ""),
+            "cost_bps": result.get("cost_bps"),
+            "with_price_path": result.get("with_price_path"),
+            "strategy_summaries": result.get("strategy_summaries", []),
+        }
+        if args.output:
+            Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.output).write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        if args.explain or not args.json:
+            print(_format_evaluate_strategies_explain(payload))
+        else:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
 
     elif args.command == "runs":
         config = Config.from_env()
@@ -665,6 +711,30 @@ def _format_evaluation_batch_explain(result: dict) -> str:
         items = _top_dimension_items(dimensions.get(key, {}))
         if items:
             lines.append(f"{title}=" + " | ".join(items))
+    return "\n".join(lines)
+
+
+def _format_evaluate_strategies_explain(result: dict) -> str:
+    lines = [
+        (
+            f"evaluated_at={result.get('evaluated_at')} "
+            f"source={result.get('snapshot_source') or '-'} "
+            f"limit={result.get('limit')} strategy_filter={result.get('strategy_filter') or '-'} "
+            f"price_path={result.get('with_price_path')}"
+        ),
+        "strategy runs picks avg_return median_return win_rate max_dd max_runup outcome shapes",
+    ]
+    if result.get("source_errors"):
+        lines.append("source_errors=" + " | ".join(result["source_errors"]))
+    for item in result.get("strategy_summaries", []):
+        shapes = item.get("shape_status_counts", {}) or {}
+        shape_text = ",".join(f"{name}:{count}" for name, count in sorted(shapes.items())) or "-"
+        lines.append(
+            f"{item.get('strategy'):<20} {item.get('run_count'):<4} {item.get('pick_count'):<5} "
+            f"{item.get('average_return_pct')!s:<10} {item.get('median_return_pct')!s:<13} "
+            f"{item.get('win_rate')!s:<8} {item.get('average_max_drawdown_pct')!s:<8} "
+            f"{item.get('average_max_runup_pct')!s:<9} {item.get('outcome'):<17} {shape_text}"
+        )
     return "\n".join(lines)
 
 

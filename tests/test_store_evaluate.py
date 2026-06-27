@@ -278,6 +278,15 @@ def test_evaluate_saved_runs_aggregates_by_strategy(tmp_path, monkeypatch):
     assert result["summary"]["average_return_pct"] == 0.0
     assert result["by_strategy"]["dual_low"]["average_return_pct"] == 10.0
     assert result["by_strategy"]["volume_breakout"]["average_return_pct"] == -10.0
+    strategy_summaries = result["strategy_summaries"]
+    assert isinstance(strategy_summaries, list)
+    assert isinstance(strategy_summaries[0], dict)
+    assert isinstance(strategy_summaries[1], dict)
+    assert strategy_summaries[0]["strategy"] == "dual_low"
+    assert strategy_summaries[0]["outcome"] == "positive"
+    assert strategy_summaries[0]["shape_status_counts"] == {"breakout_follow_through": 1}
+    assert strategy_summaries[1]["strategy"] == "volume_breakout"
+    assert strategy_summaries[1]["outcome"] == "negative"
     assert result["portfolio_summary"]["evaluated_run_count"] == 2
     assert result["portfolio_summary"]["average_portfolio_return_pct"] == 0.0
     assert result["portfolio_summary"]["portfolio_win_rate"] == 50.0
